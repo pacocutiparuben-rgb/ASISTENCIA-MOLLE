@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Control de Asistencia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --ink: #14213D;
+    --ink-soft: #2B3B5E;
+    --paper: #F6F4EF;
+    --panel: #FFFFFF;
+    --amber: #E29B00;
+    --amber-ink: #5C3D00;
+    --green: #2F6F4E;
+    --green-bg: #E3EFE8;
+    --red: #A6362B;
+    --red-bg: #F5E4E1;
+    --grey: #667085;
+    --line: rgba(20,33,61,0.14);
+    --shadow: 0 1px 2px rgba(20,33,61,0.06), 0 8px 24px rgba(20,33,61,0.06);
+    --radius: 14px;
+    color-scheme: light;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --ink: #EDEEF3;
+      --ink-soft: #C7CCDA;
+      --paper: #10141F;
+      --panel: #181E2C;
+      --amber: #F0AE22;
+      --amber-ink: #2A1D00;
+      --green: #5FB98A;
+      --green-bg: #16281F;
+      --red: #E38176;
+      --red-bg: #2C1714;
+      --grey: #9AA2B4;
+      --line: rgba(237,238,243,0.12);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #EDEEF3;
+    --ink-soft: #C7CCDA;
+    --paper: #10141F;
+    --panel: #181E2C;
+    --amber: #F0AE22;
+    --amber-ink: #2A1D00;
+    --green: #5FB98A;
+    --green-bg: #16281F;
+    --red: #E38176;
+    --red-bg: #2C1714;
+    --grey: #9AA2B4;
+    --line: rgba(237,238,243,0.12);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    min-height: 100%;
+  }
+  h1, h2, h3 { font-family: 'Space Grotesk', system-ui, sans-serif; margin: 0; }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace; font-variant-numeric: tabular-nums; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 18px 14px;
+    background: var(--ink);
+    color: var(--paper);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+  }
+  header.top .brand { display: flex; align-items: baseline; gap: 10px; }
+  header.top .brand h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  header.top .brand .co { font-size: 12px; color: rgba(246,244,239,0.6); }
+  header.top button.admin-btn {
+    background: transparent; border: 1px solid rgba(246,244,239,0.28);
+    color: var(--paper); border-radius: 999px; padding: 6px 13px;
+    font-family: 'Inter', sans-serif; font-size: 12.5px; cursor: pointer;
+  }
+  header.top button.admin-btn.on { background: var(--amber); color: var(--amber-ink); border-color: transparent; font-weight: 600; }
+
+  nav.tabs {
+    display: flex; gap: 4px; padding: 10px 14px 0; background: var(--paper);
+    overflow-x: auto; border-bottom: 1px solid var(--line);
+  }
+  nav.tabs button {
+    appearance: none; border: none; background: transparent; color: var(--grey);
+    font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 500;
+    padding: 10px 12px 12px; cursor: pointer; white-space: nowrap;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  nav.tabs button.active { color: var(--ink); border-bottom-color: var(--amber); font-weight: 600; }
+
+  main { max-width: 640px; margin: 0 auto; padding: 20px 18px 60px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .clock-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 22px 20px; text-align: center; margin-bottom: 18px;
+  }
+  .clock-card .time { font-size: 44px; font-weight: 600; letter-spacing: -0.01em; line-height: 1; }
+  .clock-card .date { color: var(--grey); font-size: 13px; margin-top: 6px; text-transform: capitalize; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12.5px; color: var(--grey); margin-bottom: 6px; font-weight: 500; }
+  select, input[type=text], input[type=date], input[type=password] {
+    width: 100%; padding: 12px 13px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); font-family: 'Inter', sans-serif; font-size: 14.5px;
+  }
+  select:focus, input:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+  .status-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; margin-bottom: 16px;
+  }
+  .status-row .who { font-weight: 600; font-size: 15px; }
+  .status-row .sub { color: var(--grey); font-size: 12.5px; margin-top: 2px; }
+  .pill { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; }
+  .pill.in { background: var(--green-bg); color: var(--green); }
+  .pill.out { background: var(--red-bg); color: var(--red); }
+  .pill.none { background: var(--line); color: var(--grey); }
+
+  .mark-btn {
+    width: 100%; border: none; border-radius: var(--radius); padding: 22px 18px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 600;
+    cursor: pointer; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    box-shadow: var(--shadow);
+  }
+  .mark-btn.entrada { background: var(--green); }
+  .mark-btn.salida { background: var(--red); }
+  .mark-btn:disabled { background: var(--line); color: var(--grey); box-shadow: none; cursor: not-allowed; }
+  .mark-btn .t { font-size: 12.5px; font-weight: 500; opacity: 0.85; font-family: 'Inter', sans-serif; }
+
+  .geo-line { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 14px; font-size: 12.5px; color: var(--grey); }
+  .geo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--grey); flex-shrink: 0; }
+  .geo-dot.ok { background: var(--green); }
+  .geo-dot.err { background: var(--red); }
+  .geo-line button { background: none; border: none; color: var(--ink); text-decoration: underline; font-size: 12.5px; cursor: pointer; padding: 0; }
+
+  .confirm-banner {
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; font-size: 14px;
+    display: none; align-items: center; gap: 10px;
+  }
+  .confirm-banner.show { display: flex; }
+  .confirm-banner.entrada { background: var(--green-bg); color: var(--green); }
+  .confirm-banner.salida { background: var(--red-bg); color: var(--red); }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin-bottom: 4px; }
+  .card .desc { color: var(--grey); font-size: 12.5px; margin-bottom: 14px; }
+
+  .btn { appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 10px 16px; border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 13.5px;
+    font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; }
+  .btn.danger { color: var(--red); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--line); }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--grey); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; background: var(--paper); }
+  tr:last-child td { border-bottom: none; }
+  a.maplink { color: var(--ink); text-decoration: underline; }
+
+  .worker-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .worker-item:last-child { border-bottom: none; }
+  .worker-item .name { font-weight: 600; font-size: 14px; }
+  .worker-item .pos { color: var(--grey); font-size: 12.5px; }
+  .worker-item.inactive .name, .worker-item.inactive .pos { opacity: 0.45; }
+
+  .empty { text-align: center; color: var(--grey); font-size: 13.5px; padding: 26px 10px; }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(20,33,61,0.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--panel); border-radius: var(--radius); padding: 22px; max-width: 340px; width: 100%; box-shadow: var(--shadow); }
+  .modal h3 { font-size: 16px; margin-bottom: 4px; }
+  .modal p { color: var(--grey); font-size: 13px; margin: 4px 0 14px; }
+  .modal .err { color: var(--red); font-size: 12.5px; min-height: 16px; margin-top: 6px; }
+
+  #qrHolder { display: flex; justify-content: center; padding: 18px; background: #fff; border-radius: 12px; margin: 14px 0; }
+  .poster-hint { font-size: 12.5px; color: var(--grey); line-height: 1.5; }
+
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>Control de Asistencia</h1>
+    <span class="co" id="coName"></span>
+  </div>
+  <button class="admin-btn" id="adminToggle">Modo administrador</button>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="marcar" class="active">Marcar</button>
+  <button data-tab="historial" class="admin-only" style="display:none">Historial</button>
+  <button data-tab="trabajadores" class="admin-only" style="display:none">Trabajadores</button>
+  <button data-tab="qr" class="admin-only" style="display:none">Cartel QR</button>
+</nav>
+
+<main>
+
+  <!-- MARCAR -->
+  <section class="panel active" id="panel-marcar">
+    <div class="clock-card">
+      <div class="time mono" id="liveClock">--:--:--</div>
+      <div class="date" id="liveDate">—</div>
+    </div>
+
+    <div class="field">
+      <label for="workerSelect">Selecciona tu nombre</label>
+      <select id="workerSelect">
+        <option value="">— Elegir trabajador —</option>
+      </select>
+    </div>
+
+    <div class="confirm-banner" id="confirmBanner"></div>
+
+    <div class="status-row" id="statusRow" style="display:none">
+      <div>
+        <div class="who" id="statusWho">—</div>
+        <div class="sub" id="statusSub">—</div>
+      </div>
+      <span class="pill none" id="statusPill">Sin registros</span>
+    </div>
+
+    <button class="mark-btn entrada" id="markBtn" disabled>
+      <span id="markBtnLabel">Elige tu nombre</span>
+      <span class="t" id="markBtnSub">para poder marcar</span>
+    </button>
+
+    <div class="geo-line">
+      <span class="geo-dot" id="geoDot"></span>
+      <span id="geoText">Obteniendo ubicación…</span>
+      <button id="geoRetry" style="display:none">reintentar</button>
+    </div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="panel" id="panel-historial">
+    <div class="card">
+      <h2>Historial de marcaciones</h2>
+      <div class="desc" id="histCount">Sin registros todavía.</div>
+      <div class="row" style="margin-bottom:12px">
+        <select id="filterWorker" style="flex:1; min-width:160px">
+          <option value="">Todos los trabajadores</option>
+        </select>
+        <input type="date" id="filterFrom" style="flex:1; min-width:140px">
+        <input type="date" id="filterTo" style="flex:1; min-width:140px">
+      </div>
+      <div class="row">
+        <button class="btn" id="clearFilters">Limpiar filtros</button>
+        <button class="btn amber" id="exportCsv">Descargar CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fecha</th><th>Hora</th><th>Trabajador</th><th>Tipo</th><th>Ubicación</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="histEmpty" style="display:none">No hay registros con estos filtros.</div>
+  </section>
+
+  <!-- TRABAJADORES -->
+  <section class="panel" id="panel-trabajadores">
+    <div class="card">
+      <h2>Añadir trabajador</h2>
+      <div class="desc">Aparecerá de inmediato en la lista de "Marcar".</div>
+      <div class="field"><label for="newName">Nombre completo</label><input type="text" id="newName" placeholder="Ej: María Fernández"></div>
+      <div class="field"><label for="newPos">Cargo (opcional)</label><input type="text" id="newPos" placeholder="Ej: Recepción"></div>
+      <button class="btn primary" id="addWorkerBtn">Añadir trabajador</button>
+    </div>
+    <div class="card">
+      <h2>Equipo</h2>
+      <div class="desc" id="workerCount">—</div>
+      <div id="workerList"></div>
+    </div>
+    <div class="card">
+      <h2>PIN de administrador</h2>
+      <div class="desc">Se pide para entrar a Historial, Trabajadores y Cartel QR.</div>
+      <div class="row">
+        <input type="text" id="newPin" placeholder="Nuevo PIN (4 dígitos)" style="flex:1; min-width:160px" inputmode="numeric" maxlength="8">
+        <button class="btn" id="savePin">Guardar PIN</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- QR -->
+  <section class="panel" id="panel-qr">
+    <div class="card">
+      <h2>Cartel para la entrada</h2>
+      <p class="poster-hint">Imprime este código y pégalo en la entrada. Cada trabajador lo escanea con la cámara de su propio celular, elige su nombre y marca su hora — se guarda automáticamente con su ubicación.</p>
+      <div id="qrHolder"></div>
+      <div class="row">
+        <button class="btn amber" id="downloadQr">Descargar QR (PNG)</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Admin PIN modal -->
+<div class="modal-bg" id="pinModalBg">
+  <div class="modal">
+    <h3>Modo administrador</h3>
+    <p>Ingresa el PIN para ver Historial, Trabajadores y el Cartel QR.</p>
+    <input type="password" id="pinInput" inputmode="numeric" placeholder="PIN">
+    <div class="err" id="pinErr"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="pinSubmit" style="flex:1">Entrar</button>
+      <button class="btn" id="pinCancel">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ============================================================
+  // 1) Crea un proyecto gratis en https://console.firebase.google.com
+  // 2) Activa "Firestore Database" (modo producción)
+  // 3) En Configuración del proyecto > Tus apps > Web, copia el
+  //    objeto de configuración y pégalo aquí abajo, reemplazando
+  //    los valores de ejemplo.
+  // 4) En Firestore > Reglas, pega las reglas del archivo
+  //    firestore.rules.txt que viene junto a este HTML.
+  // ============================================================
+  var firebaseConfig = {
+    apiKey: "AIzaSyAcq3MaHlAbqEQp0M6L8xMhq7c_KeVi6Mc",
+    authDomain: "asistencia-pasantes-349b4.firebaseapp.com",
+    projectId: "asistencia-pasantes-349b4",
+    storageBucket: "asistencia-pasantes-349b4.firebasestorage.app",
+    messagingSenderId: "1054566470200",
+    appId: "1:1054566470200:web:22dd44e7055a1d1b038ccd"
+  };
+  var needsSetup = !firebaseConfig.apiKey || firebaseConfig.apiKey === "TU_API_KEY";
+
+  var DEFAULT_PIN = "1234";
+  var state = {
+    db: null,
+    workers: [],       // {id, name, position, active}
+    records: [],        // {id, workerId, workerName, type, timestamp, lat, lng, accuracy}
+    adminUnlocked: false,
+    configPin: DEFAULT_PIN,
+    companyName: "",
+    geo: { status: 'loading', lat: null, lng: null, accuracy: null },
+    selectedWorkerId: ""
+  };
+
+  // ---------- local file download (standalone, no Claude runtime needed) ----------
+  function downloadBlob(filename, blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // ---------- tabs ----------
+  var tabsEl = document.getElementById('tabs');
+  tabsEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-tab]');
+    if (!btn) return;
+    if (btn.classList.contains('admin-only') && !state.adminUnlocked) return;
+    Array.prototype.forEach.call(tabsEl.querySelectorAll('button'), function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    Array.prototype.forEach.call(document.querySelectorAll('.panel'), function (p) { p.classList.remove('active'); });
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'qr') renderQr();
+  });
+
+  // ---------- clock ----------
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function tickClock() {
+    var d = new Date();
+    document.getElementById('liveClock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    document.getElementById('liveDate').textContent = d.toLocaleDateString('es-BO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // ---------- geolocation ----------
+  function requestGeo() {
+    state.geo.status = 'loading';
+    updateGeoUi();
+    if (!('geolocation' in navigator)) {
+      state.geo.status = 'unsupported';
+      updateGeoUi();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      state.geo.status = 'ok';
+      state.geo.lat = pos.coords.latitude;
+      state.geo.lng = pos.coords.longitude;
+      state.geo.accuracy = pos.coords.accuracy;
+      updateGeoUi();
+    }, function () {
+      state.geo.status = 'denied';
+      updateGeoUi();
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+  }
+  function updateGeoUi() {
+    var dot = document.getElementById('geoDot');
+    var text = document.getElementById('geoText');
+    var retry = document.getElementById('geoRetry');
+    dot.className = 'geo-dot';
+    retry.style.display = 'none';
+    if (state.geo.status === 'loading') { text.textContent = 'Obteniendo ubicación…'; }
+    else if (state.geo.status === 'ok') { dot.classList.add('ok'); text.textContent = 'Ubicación confirmada'; }
+    else if (state.geo.status === 'denied') { dot.classList.add('err'); text.textContent = 'Ubicación no disponible (puedes marcar igual)'; retry.style.display = 'inline'; }
+    else { dot.classList.add('err'); text.textContent = 'No se pudo obtener la ubicación'; retry.style.display = 'inline'; }
+  }
+  document.getElementById('geoRetry').addEventListener('click', requestGeo);
+  requestGeo();
+
+  // ---------- worker select / mark ----------
+  function activeWorkers() { return state.workers.filter(function (w) { return w.active !== false; }); }
+
+  function renderWorkerSelect() {
+    var sel = document.getElementById('workerSelect');
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">— Elegir trabajador —</option>';
+    activeWorkers().forEach(function (w) {
+      var o = document.createElement('option');
+      o.value = w.id; o.textContent = w.name;
+      sel.appendChild(o);
+    });
+    if (prev && activeWorkers().some(function (w) { return w.id === prev; })) sel.value = prev;
+
+    var fsel = document.getElementById('filterWorker');
+    var fprev = fsel.value;
+    fsel.innerHTML = '<option value="">Todos los trabajadores</option>';
+    state.workers.forEach(function (w) {
+      var o = document.createElement('option');
+      o.value = w.id; o.textContent = w.name;
+      fsel.appendChild(o);
+    });
+    fsel.value = fprev;
+  }
+
+  function lastRecordFor(workerId) {
+    for (var i = 0; i < state.records.length; i++) {
+      if (state.records[i].workerId === workerId) return state.records[i];
+    }
+    return null;
+  }
+
+  function refreshMarkPanel() {
+    var id = document.getElementById('workerSelect').value;
+    state.selectedWorkerId = id;
+    var statusRow = document.getElementById('statusRow');
+    var btn = document.getElementById('markBtn');
+    var label = document.getElementById('markBtnLabel');
+    var sub = document.getElementById('markBtnSub');
+
+    if (!id) {
+      statusRow.style.display = 'none';
+      btn.disabled = true; btn.className = 'mark-btn entrada';
+      label.textContent = 'Elige tu nombre'; sub.textContent = 'para poder marcar';
+      return;
+    }
+    var worker = state.workers.find(function (w) { return w.id === id; });
+    var last = lastRecordFor(id);
+    var nextType = (!last || last.type === 'salida') ? 'entrada' : 'salida';
+
+    statusRow.style.display = 'flex';
+    document.getElementById('statusWho').textContent = worker ? worker.name : '—';
+    var pill = document.getElementById('statusPill');
+    if (!last) {
+      document.getElementById('statusSub').textContent = 'Todavía no tiene registros';
+      pill.className = 'pill none'; pill.textContent = 'Sin registros';
+    } else {
+      var d = new Date(last.timestamp);
+      document.getElementById('statusSub').textContent = (last.type === 'entrada' ? 'Entró' : 'Salió') + ' a las ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      pill.className = 'pill ' + (last.type === 'entrada' ? 'in' : 'out');
+      pill.textContent = last.type === 'entrada' ? 'Dentro' : 'Fuera';
+    }
+
+    btn.disabled = false;
+    btn.className = 'mark-btn ' + nextType;
+    label.textContent = nextType === 'entrada' ? 'Marcar entrada' : 'Marcar salida';
+    sub.textContent = worker ? worker.name : '';
+  }
+  document.getElementById('workerSelect').addEventListener('change', refreshMarkPanel);
+
+  var marking = false;
+  document.getElementById('markBtn').addEventListener('click', function () {
+    if (marking) return;
+    var id = state.selectedWorkerId;
+    if (!id || !state.db) return;
+    var worker = state.workers.find(function (w) { return w.id === id; });
+    var last = lastRecordFor(id);
+    var type = (!last || last.type === 'salida') ? 'entrada' : 'salida';
+    marking = true;
+    var btn = document.getElementById('markBtn');
+    btn.disabled = true;
+    state.db.collection('records').add({
+      workerId: id,
+      workerName: worker ? worker.name : '',
+      type: type,
+      timestamp: new Date().toISOString(),
+      lat: state.geo.status === 'ok' ? state.geo.lat : null,
+      lng: state.geo.status === 'ok' ? state.geo.lng : null,
+      accuracy: state.geo.status === 'ok' ? state.geo.accuracy : null
+    }).then(function () {
+      showConfirm(type, worker ? worker.name : '');
+      marking = false;
+      refreshMarkPanel();
+    }).catch(function (err) {
+      marking = false;
+      btn.disabled = false;
+      alert('No se pudo guardar el registro. Intenta de nuevo. (' + (err && err.code ? err.code : 'error') + ')');
+    });
+  });
+
+  function showConfirm(type, name) {
+    var b = document.getElementById('confirmBanner');
+    b.className = 'confirm-banner show ' + type;
+    var now = new Date();
+    b.textContent = (type === 'entrada' ? '✓ Entrada registrada — ' : '✓ Salida registrada — ') + name + ' · ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    setTimeout(function () { b.classList.remove('show'); }, 5000);
+  }
+
+  // ---------- history ----------
+  function renderHistory() {
+    var body = document.getElementById('histBody');
+    var wFilter = document.getElementById('filterWorker').value;
+    var from = document.getElementById('filterFrom').value;
+    var to = document.getElementById('filterTo').value;
+
+    var rows = state.records.filter(function (r) {
+      if (wFilter && r.workerId !== wFilter) return false;
+      var day = r.timestamp.slice(0, 10);
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      return true;
+    });
+
+    document.getElementById('histCount').textContent = state.records.length + ' registro(s) en total.';
+    body.innerHTML = '';
+    document.getElementById('histEmpty').style.display = rows.length ? 'none' : 'block';
+
+    rows.forEach(function (r) {
+      var d = new Date(r.timestamp);
+      var tr = document.createElement('tr');
+      var loc = (r.lat != null && r.lng != null)
+        ? '<a class="maplink" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=' + r.lat + '&mlon=' + r.lng + '#map=17/' + r.lat + '/' + r.lng + '">Ver mapa</a>'
+        : '<span style="color:var(--grey)">—</span>';
+      tr.innerHTML =
+        '<td>' + d.toLocaleDateString('es-BO') + '</td>' +
+        '<td class="mono">' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + '</td>' +
+        '<td>' + escapeHtml(r.workerName || '') + '</td>' +
+        '<td><span class="pill ' + (r.type === 'entrada' ? 'in' : 'out') + '">' + (r.type === 'entrada' ? 'Entrada' : 'Salida') + '</span></td>' +
+        '<td>' + loc + '</td>';
+      body.appendChild(tr);
+    });
+  }
+  function escapeHtml(s) { return s.replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  ['filterWorker', 'filterFrom', 'filterTo'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', renderHistory);
+  });
+  document.getElementById('clearFilters').addEventListener('click', function () {
+    document.getElementById('filterWorker').value = '';
+    document.getElementById('filterFrom').value = '';
+    document.getElementById('filterTo').value = '';
+    renderHistory();
+  });
+  document.getElementById('exportCsv').addEventListener('click', function () {
+    var wFilter = document.getElementById('filterWorker').value;
+    var from = document.getElementById('filterFrom').value;
+    var to = document.getElementById('filterTo').value;
+    var rows = state.records.filter(function (r) {
+      if (wFilter && r.workerId !== wFilter) return false;
+      var day = r.timestamp.slice(0, 10);
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      return true;
+    });
+    var csv = 'Fecha,Hora,Trabajador,Tipo,Latitud,Longitud\n';
+    rows.forEach(function (r) {
+      var d = new Date(r.timestamp);
+      csv += [d.toLocaleDateString('es-BO'), pad(d.getHours()) + ':' + pad(d.getMinutes()), '"' + (r.workerName || '').replace(/"/g, '""') + '"', r.type, r.lat != null ? r.lat : '', r.lng != null ? r.lng : ''].join(',') + '\n';
+    });
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    downloadBlob('historial-asistencia.csv', blob);
+  });
+
+  // ---------- workers admin ----------
+  function renderWorkerList() {
+    var list = document.getElementById('workerList');
+    list.innerHTML = '';
+    document.getElementById('workerCount').textContent = state.workers.length + ' trabajador(es) — ' + activeWorkers().length + ' activo(s).';
+    if (!state.workers.length) { list.innerHTML = '<div class="empty">Todavía no añades a nadie.</div>'; return; }
+    state.workers.forEach(function (w) {
+      var row = document.createElement('div');
+      row.className = 'worker-item' + (w.active === false ? ' inactive' : '');
+      row.innerHTML =
+        '<div><div class="name">' + escapeHtml(w.name) + '</div><div class="pos">' + escapeHtml(w.position || '') + '</div></div>' +
+        '<div class="row"><button class="btn" data-act="toggle" data-id="' + w.id + '">' + (w.active === false ? 'Reactivar' : 'Desactivar') + '</button></div>';
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('workerList').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="toggle"]');
+    if (!btn || !state.db) return;
+    var w = state.workers.find(function (x) { return x.id === btn.dataset.id; });
+    if (!w) return;
+    state.db.collection('workers').doc(w.id).update({ active: w.active === false ? true : false }).catch(function () {});
+  });
+  document.getElementById('addWorkerBtn').addEventListener('click', function () {
+    var name = document.getElementById('newName').value.trim();
+    var pos = document.getElementById('newPos').value.trim();
+    if (!name || !state.db) return;
+    document.getElementById('addWorkerBtn').disabled = true;
+    state.db.collection('workers').add({ name: name, position: pos, active: true, createdAt: new Date().toISOString() })
+      .then(function () {
+        document.getElementById('newName').value = '';
+        document.getElementById('newPos').value = '';
+      })
+      .catch(function () { alert('No se pudo añadir al trabajador. Intenta de nuevo.'); })
+      .finally(function () { document.getElementById('addWorkerBtn').disabled = false; });
+  });
+  document.getElementById('savePin').addEventListener('click', function () {
+    var pin = document.getElementById('newPin').value.trim();
+    if (!pin || !state.db) return;
+    state.db.doc('config/app').set({ pin: pin, companyName: state.companyName || '' })
+      .then(function () { document.getElementById('newPin').value = ''; alert('PIN actualizado.'); })
+      .catch(function () { alert('No se pudo guardar el PIN.'); });
+  });
+
+  // ---------- admin gate ----------
+  var pinBg = document.getElementById('pinModalBg');
+  document.getElementById('adminToggle').addEventListener('click', function () {
+    if (state.adminUnlocked) {
+      state.adminUnlocked = false;
+      setAdminUi();
+      return;
+    }
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinErr').textContent = '';
+    pinBg.classList.add('show');
+    document.getElementById('pinInput').focus();
+  });
+  document.getElementById('pinCancel').addEventListener('click', function () { pinBg.classList.remove('show'); });
+  document.getElementById('pinSubmit').addEventListener('click', submitPin);
+  document.getElementById('pinInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPin(); });
+  function submitPin() {
+    var val = document.getElementById('pinInput').value.trim();
+    if (val === state.configPin) {
+      state.adminUnlocked = true;
+      pinBg.classList.remove('show');
+      setAdminUi();
+    } else {
+      document.getElementById('pinErr').textContent = 'PIN incorrecto.';
+    }
+  }
+  function setAdminUi() {
+    var t = document.getElementById('adminToggle');
+    t.textContent = state.adminUnlocked ? 'Salir de administrador' : 'Modo administrador';
+    t.classList.toggle('on', state.adminUnlocked);
+    Array.prototype.forEach.call(document.querySelectorAll('.admin-only'), function (el) {
+      el.style.display = state.adminUnlocked ? '' : 'none';
+    });
+    if (!state.adminUnlocked) {
+      var active = document.querySelector('nav.tabs button.active');
+      if (active && active.classList.contains('admin-only')) {
+        document.querySelector('nav.tabs button[data-tab="marcar"]').click();
+      }
+    }
+  }
+
+  // ---------- QR poster ----------
+  var qrRendered = false;
+  function renderQr() {
+    var holder = document.getElementById('qrHolder');
+    holder.innerHTML = '';
+    if (typeof QRCode === 'undefined') { holder.textContent = 'No se pudo cargar el generador de QR.'; return; }
+    new QRCode(holder, { text: window.location.href, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+    qrRendered = true;
+  }
+  document.getElementById('downloadQr').addEventListener('click', function () {
+    if (!qrRendered) renderQr();
+    setTimeout(function () {
+      var canvas = document.querySelector('#qrHolder canvas');
+      var img = document.querySelector('#qrHolder img');
+      if (canvas) {
+        canvas.toBlob(function (blob) { downloadBlob('cartel-qr-asistencia.png', blob); });
+      } else if (img && img.src) {
+        fetch(img.src).then(function (r) { return r.blob(); }).then(function (blob) {
+          downloadBlob('cartel-qr-asistencia.png', blob);
+        });
+      }
+    }, 60);
+  });
+
+  // ---------- boot: Firebase ----------
+  function boot() {
+    if (needsSetup) {
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div style="background:#A6362B;color:#fff;padding:12px 16px;font-size:13px;text-align:center;line-height:1.5">' +
+        'Falta configurar Firebase: abre el archivo <code>index.html</code>, busca <code>firebaseConfig</code> cerca del inicio del ' +
+        '<code>&lt;script&gt;</code> y pega ahí los datos de tu proyecto (ver README).</div>');
+      return;
+    }
+
+    try {
+      var app = firebase.initializeApp(firebaseConfig);
+      state.db = firebase.firestore();
+    } catch (e) {
+      document.body.insertAdjacentHTML('afterbegin',
+        '<div style="background:#A6362B;color:#fff;padding:12px 16px;font-size:13px;text-align:center">' +
+        'No se pudo conectar a Firebase. Revisa que los datos de firebaseConfig sean correctos.</div>');
+      return;
+    }
+
+    // config (pin + company name)
+    state.db.doc('config/app').onSnapshot(function (snap) {
+      var d = snap.exists ? snap.data() : null;
+      state.configPin = (d && d.pin) ? d.pin : DEFAULT_PIN;
+      state.companyName = (d && d.companyName) ? d.companyName : '';
+      document.getElementById('coName').textContent = state.companyName;
+    }, function () {});
+
+    // workers
+    state.db.collection('workers').orderBy('name', 'asc').onSnapshot(function (qs) {
+      state.workers = qs.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      renderWorkerSelect();
+      renderWorkerList();
+      refreshMarkPanel();
+      renderHistory();
+    }, function () {});
+
+    // records (most recent 500)
+    state.db.collection('records').orderBy('timestamp', 'desc').limit(500).onSnapshot(function (qs) {
+      state.records = qs.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      refreshMarkPanel();
+      renderHistory();
+    }, function () {});
+  }
+  boot();
+  setAdminUi();
+})();
+</script>
+</body>
+</html>
