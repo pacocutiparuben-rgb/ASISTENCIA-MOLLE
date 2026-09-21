@@ -476,8 +476,9 @@
     retry.style.display = 'none';
     if (state.geo.status === 'loading') { text.textContent = 'Obteniendo ubicación…'; }
     else if (state.geo.status === 'ok') { dot.classList.add('ok'); text.textContent = 'Ubicación confirmada'; }
-    else if (state.geo.status === 'denied') { dot.classList.add('err'); text.textContent = 'Ubicación no disponible (puedes marcar igual)'; retry.style.display = 'inline'; }
+    else if (state.geo.status === 'denied') { dot.classList.add('err'); text.textContent = 'Ubicación desactivada: actívala en tu celular para poder marcar'; retry.style.display = 'inline'; }
     else { dot.classList.add('err'); text.textContent = 'No se pudo obtener la ubicación'; retry.style.display = 'inline'; }
+    refreshMarkPanel();
   }
   document.getElementById('geoRetry').addEventListener('click', requestGeo);
   requestGeo();
@@ -566,6 +567,13 @@
     }
 
     btn.style.display = 'flex';
+    if (state.geo.status !== 'ok') {
+      btn.disabled = true;
+      btn.className = 'mark-btn ' + nextType;
+      label.textContent = 'Activa tu ubicación';
+      sub.textContent = 'para poder marcar';
+      return;
+    }
     btn.disabled = false;
     btn.className = 'mark-btn ' + nextType;
     label.textContent = nextType === 'entrada' ? 'Marcar entrada' : 'Marcar salida';
@@ -593,6 +601,7 @@
     if (marking) return;
     var id = state.selectedWorkerId;
     if (!id || id !== state.verifiedWorkerId || !state.db) return;
+    if (state.geo.status !== 'ok') { alert('Necesitamos tu ubicación para registrar la marcación. Activa el GPS/ubicación de tu celular e inténtalo de nuevo.'); return; }
     var worker = state.workers.find(function (w) { return w.id === id; });
     var last = lastRecordFor(id);
     var type = (!last || last.type === 'salida') ? 'entrada' : 'salida';
