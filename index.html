@@ -13,37 +13,37 @@
 <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
 <style>
   :root {
-    --ink: #1B2430;
-    --ink-soft: #3A4655;
-    --paper: #EEF0F2;
+    --ink: #123A5E;
+    --ink-soft: #2F5C82;
+    --paper: #E7F3FC;
     --panel: #FFFFFF;
-    --accent: #FF5A36;
-    --accent-ink: #4A1400;
+    --accent: #29A3DE;
+    --accent-ink: #04304A;
     --green: #1F8A5F;
     --green-bg: #DFF2E8;
     --red: #D6402C;
     --red-bg: #FBE3DE;
-    --grey: #66707D;
-    --line: rgba(27,36,48,0.13);
-    --shadow: 0 1px 2px rgba(27,36,48,0.07), 0 10px 26px rgba(27,36,48,0.07);
+    --grey: #5C7793;
+    --line: rgba(18,58,94,0.14);
+    --shadow: 0 1px 2px rgba(18,58,94,0.08), 0 10px 26px rgba(18,58,94,0.08);
     --radius: 16px;
     color-scheme: light;
   }
   :root:not([data-theme="light"]) {
     @media (prefers-color-scheme: dark) {
-      --ink: #ECEEF2; --ink-soft: #C7CCD6; --paper: #10141C; --panel: #181F2B;
-      --accent: #FF7A5C; --accent-ink: #340B00;
+      --ink: #DCEEFB; --ink-soft: #AFD3EC; --paper: #071826; --panel: #0F2740;
+      --accent: #4FC3F7; --accent-ink: #04202E;
       --green: #5FCB9B; --green-bg: #14271F; --red: #F08B7C; --red-bg: #2B1613;
-      --grey: #9BA3B2; --line: rgba(236,238,242,0.12);
+      --grey: #8FB0CB; --line: rgba(220,238,251,0.14);
       --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 10px 26px rgba(0,0,0,0.4);
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --ink: #ECEEF2; --ink-soft: #C7CCD6; --paper: #10141C; --panel: #181F2B;
-    --accent: #FF7A5C; --accent-ink: #340B00;
+    --ink: #DCEEFB; --ink-soft: #AFD3EC; --paper: #071826; --panel: #0F2740;
+    --accent: #4FC3F7; --accent-ink: #04202E;
     --green: #5FCB9B; --green-bg: #14271F; --red: #F08B7C; --red-bg: #2B1613;
-    --grey: #9BA3B2; --line: rgba(236,238,242,0.12);
+    --grey: #8FB0CB; --line: rgba(220,238,251,0.14);
     --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 10px 26px rgba(0,0,0,0.4);
     color-scheme: dark;
   }
@@ -790,6 +790,7 @@
         '<div class="acts">' +
         '<button class="btn ghost" data-act="changepin" data-id="' + w.id + '">Cambiar PIN</button>' +
         '<button class="btn ghost" data-act="toggle" data-id="' + w.id + '">' + (w.active === false ? 'Reactivar' : 'Desactivar') + '</button>' +
+        '<button class="btn ghost" data-act="delete" data-id="' + w.id + '" style="color:var(--red)">Eliminar</button>' +
         '</div>';
       list.appendChild(row);
     });
@@ -797,9 +798,16 @@
   document.getElementById('workerList').addEventListener('click', function (e) {
     var toggleBtn = e.target.closest('button[data-act="toggle"]');
     var pinBtn = e.target.closest('button[data-act="changepin"]');
+    var delBtn = e.target.closest('button[data-act="delete"]');
     if (toggleBtn && state.db) {
       var w1 = state.workers.find(function (x) { return x.id === toggleBtn.dataset.id; });
       if (w1) state.db.collection('workers').doc(w1.id).update({ active: w1.active === false ? true : false }).catch(function () {});
+    }
+    if (delBtn && state.db) {
+      var w3 = state.workers.find(function (x) { return x.id === delBtn.dataset.id; });
+      if (w3 && confirm('¿Eliminar a ' + w3.name + '? Ya no podrá elegir su nombre para marcar. Sus registros pasados en el historial se conservan.')) {
+        state.db.collection('workers').doc(w3.id).delete().catch(function () { alert('No se pudo eliminar. Intenta de nuevo.'); });
+      }
     }
     if (pinBtn) {
       var w2 = state.workers.find(function (x) { return x.id === pinBtn.dataset.id; });
