@@ -292,7 +292,7 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Fecha</th><th>Hora</th><th>Trabajador</th><th>Tipo</th><th>Ubicación</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Hora</th><th>Trabajador</th><th>Tipo</th><th>Ubicación</th><th>Acciones</th></tr></thead>
         <tbody id="histBody"></tbody>
       </table>
     </div>
@@ -663,13 +663,25 @@
         '<td class="mono">' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + '</td>' +
         '<td>' + escapeHtml(r.workerName || '') + '</td>' +
         '<td><span class="pill ' + (r.type === 'entrada' ? 'in' : 'out') + '">' + (r.type === 'entrada' ? 'Entrada' : 'Salida') + '</span></td>' +
-        '<td>' + loc + '</td>';
+        '<td>' + loc + '</td>' +
+        '<td><button class="btn ghost" data-act="delrecord" data-id="' + r.id + '" style="color:var(--red)">Eliminar</button></td>';
       body.appendChild(tr);
     });
   }
 
   ['filterWorker', 'filterFrom', 'filterTo'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', renderHistory);
+  });
+  document.getElementById('histBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act="delrecord"]');
+    if (!btn || !state.db) return;
+    var rec = state.records.find(function (r) { return r.id === btn.dataset.id; });
+    if (!rec) return;
+    var d = new Date(rec.timestamp);
+    var label = (rec.type === 'entrada' ? 'Entrada' : 'Salida') + ' de ' + (rec.workerName || '') + ' el ' + d.toLocaleDateString('es-BO') + ' a las ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    if (confirm('¿Eliminar este registro?\n' + label + '\nEsta acción no se puede deshacer.')) {
+      state.db.collection('records').doc(rec.id).delete().catch(function () { alert('No se pudo eliminar el registro. Intenta de nuevo.'); });
+    }
   });
   document.getElementById('clearFilters').addEventListener('click', function () {
     document.getElementById('filterWorker').value = '';
